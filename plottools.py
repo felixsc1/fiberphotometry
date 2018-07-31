@@ -10,7 +10,7 @@ import plotly.graph_objs as go
 py.offline.init_notebook_mode(connected=True)
 
 
-def CreateLayout(stim_events,duration,inputframe):
+def CreateLayout(stim_events,duration,inputframe,titleinput):
     shapes1 = list()
     
 #    for i in stim_events:
@@ -48,7 +48,7 @@ def CreateLayout(stim_events,duration,inputframe):
     
         
     layout = go.Layout(
-        title='responses',
+        title=titleinput,
         yaxis=dict(
         title='%'
         ),
@@ -59,21 +59,28 @@ def CreateLayout(stim_events,duration,inputframe):
         )
     return layout
 
-def plotlyplot(inputframe,stim_events,duration=0.5,names='1234567890',plotmean=True):
+def plotlyplot(inputframe,stim_events,duration=0.5,plotmean=True,titleinput='',
+               normalize=False):
+    if normalize:
+        inputframe=inputframe.divide(inputframe.max())
+        
+    names=inputframe.columns
     xaxis=inputframe.index.values
     traceA = []
     k=0
     for i in range(inputframe.columns.size):
         traceA.append(go.Scatter(x=xaxis, y=inputframe.iloc[:,i].values,
                                  mode = 'lines' ,line=dict(width=1.0),
-                                 name=names[k], showlegend=True))
+                                 name=names[k], showlegend=True,
+                                 connectgaps=True))
         k+=1
     
     if plotmean==True:
         traceA.append(go.Scatter(x=xaxis, y=inputframe.mean(axis=1).values,
                                  mode = 'lines' ,line=dict(width=1.5,color='black'),
-                                 name='mean', showlegend=True))
+                                 name='mean', showlegend=True,
+                                 connectgaps=True))
 
     
-    fig = go.Figure(data=traceA, layout=CreateLayout(stim_events,duration,inputframe))
+    fig = go.Figure(data=traceA, layout=CreateLayout(stim_events,duration,inputframe,titleinput))
     py.offline.iplot(fig)   
