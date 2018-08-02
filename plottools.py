@@ -60,7 +60,7 @@ def CreateLayout(stim_events,duration,inputframe,titleinput):
     return layout
 
 def plotlyplot(inputframe,stim_events,duration=0.5,plotmean=True,titleinput='',
-               normalize=False):
+               normalize=False,saveplot=False):
     if normalize:
         inputframe=inputframe.divide(inputframe.max())
         
@@ -83,4 +83,8 @@ def plotlyplot(inputframe,stim_events,duration=0.5,plotmean=True,titleinput='',
 
     
     fig = go.Figure(data=traceA, layout=CreateLayout(stim_events,duration,inputframe,titleinput))
-    py.offline.iplot(fig)   
+    
+    if saveplot==False:
+        py.offline.iplot(fig)   
+    else:
+        py.offline.iplot(fig,image='svg', filename=saveplot)  
