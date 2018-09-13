@@ -1,6 +1,8 @@
-#!/home/aic/anaconda3/bin/python
+#!/usr/bin/python3
 
-##!/usr/bin/python3
+##!/home/aic/anaconda3/bin/python
+
+
 
 #usage: run script within a folder where there are all the scan number subfolders e.g. 34 35 36 etc..  
 # put the converted file in the same folder as the 2dseq unline the nrmal convert_bruker_batch.py
@@ -66,7 +68,10 @@ def conversion(methodfilewithpath):
     FOV = FOV.group(1,2)
 
     Segments = Segments1.search(method_fulltext)
-    Segments = Segments.group(1)
+    if Segments is None:
+        return
+    else:
+        Segments = Segments.group(1)
 
 ####part 2: calculate parameters and create the to3d command
 
@@ -140,8 +145,9 @@ for folderName, subfolders, filenames in os.walk(cwd):
                 if y:
                     print('scan '+ folderName + ' already converted.')
             except:
-                conversion(os.path.join(folderName,file))
+                convertpath = os.path.join(folderName,file)
+                print('converting ' + convertpath)
+                conversion(convertpath)
                 i += 1
-                print('converting')
 print('In total '+ str(i) + ' scans converted.')
 
