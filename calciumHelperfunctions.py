@@ -47,7 +47,7 @@ def detect_stim_paradigm(stimchannel, fs):
     print('OFF period: ' + str(off_period) + 's')
     period = (block_duration + off_period) * 2
     print('Signals slower than ' + str(period) + 's will be removed (later)')
-    return n_pulses, n_blocks, stim_freq, pulses_block, block_duration, off_period, peakindexes_sec, peakindexes
+    return n_pulses, n_blocks, stim_freq, pulses_block, block_duration, off_period, peakindexes_sec, peakindexes, period
 
 
 def FFT_calculate_plot(calcium, fs, plotsize):
@@ -87,7 +87,7 @@ def addReferences(calcium, mod_ch1, mod_ch2):
     # multiply them with raw signals
     calcium['channel1', 'demod_sin'] = calcium['channel1', 'raw']*calcium['channel1', 'sin_ref']
     calcium['channel1', 'demod_cos'] = calcium['channel1', 'raw']*calcium['channel1', 'cos_ref']
-
+    
     calcium['channel2', 'demod_sin'] = calcium['channel2', 'raw']*calcium['channel2', 'sin_ref']
     calcium['channel2', 'demod_cos'] = calcium['channel2', 'raw']*calcium['channel2', 'cos_ref']
     return calcium
@@ -124,10 +124,12 @@ def demodulate(calcium, mod_ch1, mod_ch2, fs, peakindexes_sec):
     order = 9
     cutoff = calc_cutoff_freqs(mod_ch1, mod_ch2)
     
+    calcium = addReferences(calcium, mod_ch1, mod_ch2)
+    
     # apply initial low pass filter
     calcium['channel1', 'demod_sin_filtered'] = butter_lowpass_filter(calcium['channel1','demod_sin'], cutoff[0], fs, order)
     calcium['channel1', 'demod_cos_filtered'] = butter_lowpass_filter(calcium['channel1','demod_cos'], cutoff[0], fs, order)
-
+    
     calcium['channel2', 'demod_sin_filtered'] = butter_lowpass_filter(calcium['channel2','demod_sin'], cutoff[2], fs, order)
     calcium['channel2', 'demod_cos_filtered'] = butter_lowpass_filter(calcium['channel2','demod_cos'], cutoff[2], fs, order)
 
@@ -207,3 +209,32 @@ def fixjumps(data, data_x, ch, fs, tres_new, xSTD=6, secstoconsider=0.5):
             data_cor[i]=data[i]-delta
     data_cor[-1]=data[-1]-delta
     return data_cor
+
+def calciumDetrend(calcium_ds, N, pnum, plotsize, peakindexes_sec):
+    fit = np.polyfit(calcium_ds.index,calcium_ds['channel'+N,'downsampled_fixed'],pnum)
+    y = np.poly1d(fit)
+    calcium_ds['channel'+N,'baseline_fit']=y(calcium_ds.index)
+    calcium_ds['channel'+N,'detrended']=calcium_ds['channel'+N,'downsampled_fixed']-calcium_ds['channel'+N,'baseline_fit']+y[0]  #adding the mean value back
+
+    plt.figure(figsize=plotsize)
+    plt.subplot(2, 1, 1)
+    plt.title('channel ' + N)
+    plt.plot(calcium_ds['channel'+N,'downsampled_fixed'], 'k-', label='signal original')
+    plt.plot(calcium_ds['channel'+N,'baseline_fit'], 'b-', label='baseline fit')
+    plt.legend()
+
+    plt.subplot(2, 1, 2)
+    plt.plot(calcium_ds['channel'+N,'detrended'], 'k-', label='signal detrended')
+    plt.legend()
+    plt.xlabel('time [s]')
+    _ = [plt.axvline(_p, alpha=0.2, color='red') for _p in peakindexes_sec]
+    return calcium_ds
+
+def find_optimal_polynomial(calcium_ds, period):
+    D=calcium_ds.index[-1]
+    pnum = 1 + int(D/period)
+    pHz = (pnum - 2)/D
+    print('polynomial degree ', str(pnum))
+    if pnum > 2:
+        print('Approximately high-pass filter with ' + str(np.round(1/pHz)) + 's period.' )
+    return pnum
