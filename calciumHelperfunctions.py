@@ -8,6 +8,15 @@ from scipy import signal
 import matplotlib.pyplot as plt
 from scipy.signal import butter, lfilter, freqz
 import pandas as pd
+import plotly as py
+import plotly.graph_objs as go
+from IPython.display import set_matplotlib_formats
+set_matplotlib_formats('retina')
+import pylab
+
+
+plt.style.use('seaborn-white')
+py.offline.init_notebook_mode(connected=True)
 
 def openfiledialogue(whichending):
     root = Tk()
@@ -180,8 +189,8 @@ def plot_filter_stuff(calcium, which_freq, fs, plotsize):
     plt.subplots_adjust(hspace=0.35)
     
 
-def downsamplebin(channel, timeres, sampling):
-    N_samples = int(timeres*sampling)
+def downsamplebin(channel, timeresOUT, samplingrateIN):
+    N_samples = int(timeresOUT*samplingrateIN)
     lastpoint = int(np.arange(0,np.size(channel), N_samples)[-1])
     out = np.reshape(channel[0:lastpoint], (-1, N_samples))
 #     out = np.mean(out, axis=1)
@@ -210,7 +219,7 @@ def fixjumps(data, data_x, ch, fs, tres_new, xSTD=6, secstoconsider=0.5):
     data_cor[-1]=data[-1]-delta
     return data_cor
 
-def calciumDetrend(calcium_ds, N, pnum, plotsize, peakindexes_sec):
+def calciumDetrend(calcium_ds, N, pnum, plotsize, peakindexes_sec, storagepath):
     fit = np.polyfit(calcium_ds.index,calcium_ds['channel'+N,'downsampled_fixed'],pnum)
     y = np.poly1d(fit)
     calcium_ds['channel'+N,'baseline_fit']=y(calcium_ds.index)
@@ -228,6 +237,7 @@ def calciumDetrend(calcium_ds, N, pnum, plotsize, peakindexes_sec):
     plt.legend()
     plt.xlabel('time [s]')
     _ = [plt.axvline(_p, alpha=0.2, color='red') for _p in peakindexes_sec]
+    pylab.savefig(os.path.join(storagepath,f'detrended_ch{N}.svg'))
     return calcium_ds
 
 def find_optimal_polynomial(calcium_ds, period):
@@ -238,3 +248,142 @@ def find_optimal_polynomial(calcium_ds, period):
     if pnum > 2:
         print('Approximately high-pass filter with ' + str(np.round(1/pHz)) + 's period.' )
     return pnum
+
+
+def frange(start, stop, step):
+     x = start
+     while x < stop:
+         yield x
+         x += step
+
+
+def average_and_plot(which_channel, n_blocks, block_duration, stim_freq, calcium_ds, baseline, _time, tres_new, peakindexes_sec, storagepath):
+ 
+    idx = pd.IndexSlice  #see my notes, this allows slicing multilevel data
+    
+    block = []
+    for n in range(n_blocks):
+        _blockbegin = peakindexes_sec[0+n*int(block_duration*stim_freq)]
+        block.append(calcium_ds.loc[idx[_blockbegin-baseline:_blockbegin+block_duration+_time],idx[which_channel,'detrended']].reset_index(drop=True))
+        test=calcium_ds.loc[idx[_blockbegin-baseline:_blockbegin+block_duration+_time],idx[which_channel,'detrended']]
+    if 'discardN' in locals():
+        for i in sorted(discardN, reverse=True):
+            del block[i]
+#     block_time = np.arange(-baseline-tres_new,block_duration+_time,tres_new)  #sometimes error "length of values does not match lengh of index", then change to:   (-baseline+tres_new...
+    block_time = np.arange(-baseline,block_duration+_time,tres_new)  #sometimes error "length of values doenst match lengh of index", then change to:   (-baseline+tres_new...
+    blocks = pd.concat(block, axis=1, ignore_index = True)
+    if blocks.shape[0] != block_time.size:
+        block_time = np.arange(-baseline-tres_new,block_duration+_time,tres_new)
+        
+    blockIndex = pd.Index(block_time+tres_new, name='Time [s]')
+        
+    blocks['time'] = blockIndex
+    blocks.set_index('time',drop=True,inplace=True)
+    
+    
+    plt.rcParams.update({'font.size': 16})
+
+    # taking the mean before every block as its own baseline to calculate percentage
+    blocks = blocks.sort_index(axis=0)
+    blocks = blocks.sort_index(axis=1)
+    blocks_percent = (blocks / blocks.loc[-baseline:0,:].mean() - 1)*100
+
+    blocks_percent['mean'] = blocks_percent.mean(axis=1)
+    blocks_percent['SD'] = blocks_percent.std(axis=1)
+    blocks_percent['upper'] = blocks_percent['mean']+blocks_percent['SD']
+    blocks_percent['lower'] = blocks_percent['mean']-blocks_percent['SD']
+        
+    
+    
+    shapes1 = list()
+    for i in np.arange(0,block_duration,1/stim_freq):
+        shapes1.append({
+            'type': 'line',
+            'xref': 'x',
+            'yref': 'y',
+            'x0': i,
+            'y0': np.min(blocks.min(axis=1)),
+            'x1': i,
+            'y1': np.max(blocks.max(axis=1)),
+            'opacity':0.2,
+            'layer': 'above',
+            'line':{
+                'color':'red',
+            },
+        })
+
+ 
+    shapes2 = list()
+    for i in frange(0,block_duration,1/stim_freq):
+        shapes2.append({
+            'type': 'line',
+            'xref': 'x',
+            'yref': 'y',
+            'x0': i,
+            'y0': 0,
+            'x1': i,
+            'y1': np.max(blocks_percent['mean'].values)*1.3,
+            'opacity':0.3,
+            'layer': 'above',
+            'line':{
+                'color':'red',
+            },
+        })  
+    
+    allshapes=[shapes1, shapes2]
+    
+    def plotlylayout(what, units, percent):
+        layout1 = go.Layout(
+            title=what + ' - ' + which_channel,
+            yaxis=dict(
+                title=units
+            ),
+            xaxis=dict(
+                title='time [s]'
+            ),
+            shapes=allshapes[percent]
+        )
+        return layout1
+        
+    traceA=[]
+    for i in range(blocks.columns.size):
+        traceA.append(go.Scatter(x=blocks.index.values, y=blocks.iloc[:,i].values, mode = 'lines', name = 'block '+str(i)))
+    
+    fig = go.Figure(data=traceA, layout=plotlylayout('all blocks','arbitrary units',0))
+    py.offline.iplot(fig)
+   
+
+    traceB=go.Scatter(x=blocks_percent.index.values, y=blocks_percent['mean'].values, mode = 'lines' ,line=dict(width=1, color='blue'), name = 'mean response')
+    
+    traceB_lower = go.Scatter(
+    x=blocks_percent.index.values,
+    y=blocks_percent['lower'].values,
+    mode='lines',
+    marker=dict(color="black"),
+    fill='tonexty',
+    fillcolor='rgba(0,176,246,0.2)',
+    line=dict(width=0),
+    name='lower bound',
+    showlegend=False,
+    )
+  
+    
+    traceB_upper = go.Scatter(
+    x=blocks_percent.index.values,
+    y=blocks_percent['upper'].values,
+    mode='lines',
+    marker=dict(color="black"),
+    fill='tonexty',
+    fillcolor='rgba(0,176,246,0.2)',
+    line=dict(width=0),
+    name='upper bound',
+    showlegend=False,
+    )
+    
+    
+    fig = go.Figure(data=[traceB, traceB_upper, traceB_lower], layout=plotlylayout('mean response ± SD', '% change',1))
+#     py.offline.iplot(fig)
+    py.offline.iplot(fig, image='svg', filename=os.path.join(storagepath,'percentage_averaged'))
+    
+    return blocks_percent
+    
