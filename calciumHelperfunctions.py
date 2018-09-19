@@ -314,7 +314,7 @@ def average_and_plot(which_channel, n_blocks, block_duration, stim_freq, calcium
 
  
     shapes2 = list()
-    for i in frange(0,block_duration,1/stim_freq):
+    for i in np.arange(0,block_duration,1/stim_freq):
         shapes2.append({
             'type': 'line',
             'xref': 'x',
@@ -382,8 +382,8 @@ def average_and_plot(which_channel, n_blocks, block_duration, stim_freq, calcium
     
     
     fig = go.Figure(data=[traceB, traceB_upper, traceB_lower], layout=plotlylayout('mean response ± SD', '% change',1))
-#     py.offline.iplot(fig)
-    py.offline.iplot(fig, image='svg', filename=os.path.join(storagepath,'percentage_averaged'))
+    py.offline.iplot(fig)
+#     py.offline.iplot(fig, image='svg', filename=os.path.join(storagepath,'percentage_averaged'))
     
     return blocks_percent
     
