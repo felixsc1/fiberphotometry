@@ -8,6 +8,7 @@ home = expanduser("~")
 
 # Creates an empty class, to group a bunch of variables.
 # See https://www.oreilly.com/library/view/python-cookbook/0596001673/ch01s08.html
+# doesnt work with papermill! non json seriliazable error
 class Settings:
     def __init__(self, **kwds):
         self.__dict__.update(kwds)
@@ -64,7 +65,7 @@ def find_animal_folders(info, raw_folder):
     return info
 
 def getinfo(folders):
-    info = pd.read_excel(f"{folders.main}/{folders.excel}", convert_float=True)
+    info = pd.read_excel(f"{folders['main']}/{folders['excel']}", convert_float=True)
     info.columns = map(str.lower, info.columns)
     info.set_index('scan', inplace=True)
     # info = info.append({'animal-id': 'folder'}, ignore_index=True)
@@ -72,7 +73,7 @@ def getinfo(folders):
     # def get_subject_folders(main_folder, info):
     #     for animal in info.columns
 
-    info = find_animal_folders(info, folders.raw)
+    info = find_animal_folders(info, folders['raw'])
     return(info)
 
 
@@ -91,10 +92,10 @@ def check_and_convert(folders, animal):
     Is there already a folder for this animal in the main analysis folder?
     If not, create it and convert all 2dseqs of this animal and move them to analysis subfolder
     """
-    animal_output_folder = os.path.join(folders.analysis,animal)
+    animal_output_folder = os.path.join(folders['analysis'],animal)
     if not os.path.exists(animal_output_folder):
         os.makedirs(animal_output_folder)
-        convertAll(folders.animal, animal_output_folder)
+        convertAll(folders['animal'], animal_output_folder)
 
         
         
@@ -104,11 +105,11 @@ def simple_coreg(template, scans, out_dir):
     pre scan will be coregistered to template, identical transformation will be applied to post_scan (no motion between pre and post!)
     """
     parameters = os.path.join(out_dir,'1dparams.1D')
-#     runAFNI(f"3dAllineate -base {template} -source {scans.pre} -prefix {out_dir}/pre_coreg -cost ls -zclip -interp quintic -final wsinc5 -twopass -twoblur 2 -fineblur 0.5 -nmatch 80% -conv 0.01 -1Dparam_save {parameters}")
-#     runAFNI(f"3dAllineate -1Dparam_apply {parameters} -source {scans.post} -prefix {out_dir}/post_coreg -cost ls -zclip -interp quintic -final wsinc5 -twopass -twoblur 2 -fineblur 0.5 -nmatch 80% -conv 0.01 -master {template}")
+    runAFNI(f"3dAllineate -base {template} -source {scans['pre']} -prefix {out_dir}/pre_coreg -cost ls -zclip -interp quintic -final wsinc5 -twopass -twoblur 2 -fineblur 0.5 -nmatch 80% -conv 0.01 -1Dparam_save {parameters}")
+    runAFNI(f"3dAllineate -1Dparam_apply {parameters} -source {scans['post']} -prefix {out_dir}/post_coreg -cost ls -zclip -interp quintic -final wsinc5 -twopass -twoblur 2 -fineblur 0.5 -nmatch 80% -conv 0.01 -master {template}")
     
-    scans.pre_coreg = f"{out_dir}/pre_coreg+orig"
-    scans.post_coreg = f"{out_dir}/post_coreg+orig"
+    scans['pre_coreg'] = f"{out_dir}/pre_coreg+orig"
+    scans['post_coreg'] = f"{out_dir}/post_coreg+orig"
     return scans
     
     
