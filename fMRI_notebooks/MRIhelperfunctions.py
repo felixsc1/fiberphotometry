@@ -99,18 +99,17 @@ def check_and_convert(folders, animal):
 
         
         
-def simple_coreg(template, scans, out_dir):
+def simple_coreg(template, scanA, scanB, out_dir):
     """
-    scans must contain two files with full path: .pre and .post
-    pre scan will be coregistered to template, identical transformation will be applied to post_scan (no motion between pre and post!)
+    scanA will be coregistered to template, identical transformation will be applied to scanB (no motion between A and B!)
     """
     parameters = os.path.join(out_dir,'1dparams.1D')
-    runAFNI(f"3dAllineate -base {template} -source {scans['pre']} -prefix {out_dir}/pre_coreg -cost ls -zclip -interp quintic -final wsinc5 -twopass -twoblur 2 -fineblur 0.5 -nmatch 80% -conv 0.01 -1Dparam_save {parameters}")
-    runAFNI(f"3dAllineate -1Dparam_apply {parameters} -source {scans['post']} -prefix {out_dir}/post_coreg -cost ls -zclip -interp quintic -final wsinc5 -twopass -twoblur 2 -fineblur 0.5 -nmatch 80% -conv 0.01 -master {template}")
+    scanAloc = f"{out_dir}/A_coreg.nii"
+    scanBloc = f"{out_dir}/B_coreg.nii"
+    runAFNI(f"3dAllineate -base {template} -source {scanA} -prefix {scanAloc} -cost ls -zclip -interp quintic -final wsinc5 -twopass -twoblur 2 -fineblur 0.5 -nmatch 80% -conv 0.01 -1Dparam_save {parameters}")
+    runAFNI(f"3dAllineate -1Dparam_apply {parameters} -source {scanB} -prefix {scanBloc} -cost ls -zclip -interp quintic -final wsinc5 -twopass -twoblur 2 -fineblur 0.5 -nmatch 80% -conv 0.01 -master {template}")
     
-    scans['pre_coreg'] = f"{out_dir}/pre_coreg+orig"
-    scans['post_coreg'] = f"{out_dir}/post_coreg+orig"
-    return scans
+    return scanAloc, scanBloc
     
     
     #     runAFNI("python2.7 " + home + "/abin/align_epi_anat.py -dset1to2 -dset1 " + scanA + " -dset2 " + template + \
