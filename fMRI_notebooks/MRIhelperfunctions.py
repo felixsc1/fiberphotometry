@@ -111,17 +111,23 @@ def simple_coreg(template, scanA, scanB, out_dir):
     
     return scanAloc, scanBloc
     
-    
-    #     runAFNI("python2.7 " + home + "/abin/align_epi_anat.py -dset1to2 -dset1 " + scanA + " -dset2 " + template + \
-#                                     " -child_dset1 " + scanA + ' ' + scanB + \
-#                                     " -output_dir " + out_dir + \
-#                                     " -dset1_strip None -dset2_strip None" \
-#                                     " -overwrite" \
-#                                     " -big_move" \
-#                                     " -volreg off" \
-#                                     " -Allineate_opts '-maxrot 10 -maxshf 3 -conv 0.005 -twofirst -twoblur 0.8 -source_automask+2 -final wsinc5'" \
-#                                     " -tshift on -tshift_opts '-tzero 0 -quintic'" \
-#                                     " -suffix .coreg" \
-#                                     " -save_vr" \
-#                                     " -cost lpa")
+
+def coreg_epi(template, scanA, scanB, out_dir):
+    """
+    difference to simple_coreg: also does -tshift,
+    volreg off as global bolus inflow could be mistaken for movement.
+    WARNING: AFNI gives error for some reason
+    """
+    runAFNI("python2.7 " + home + "/abin/align_epi_anat.py -dset1to2 -dset1 " + scanA + " -dset2 " + template + \
+                                " -child_dset1 " + scanB + \
+                                " -output_dir " + out_dir + \
+                                " -dset1_strip None -dset2_strip None" \
+                                " -overwrite" \
+                                " -big_move" \
+                                " -volreg off" \
+                                " -Allineate_opts '-maxrot 10 -maxshf 3 -conv 0.005 -twofirst -twoblur 0.8 -source_automask+2 -final wsinc5'" \
+                                " -tshift on -tshift_opts '-tzero 0 -quintic'" \
+                                " -suffix .coreg" \
+                                " -save_vr" \
+                                " -cost ls")
 
