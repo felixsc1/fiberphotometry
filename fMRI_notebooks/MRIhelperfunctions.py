@@ -2,6 +2,8 @@ import subprocess
 import os
 import numpy as np
 import pandas as pd
+import nibabel as nib
+import papermill as pm
 
 from os.path import expanduser
 home = expanduser("~")
@@ -131,3 +133,27 @@ def coreg_epi(template, scanA, scanB, out_dir):
                                 " -save_vr" \
                                 " -cost ls")
 
+
+def save_nifti(data, dimensions, folders, animal, prefix):
+    """
+    Input:  data is flattened np array.
+            dimension contains matrix size and nifti affine matrix.
+            folders contains output folder.
+            animal is animal ID.
+            prefix will be combined with animal ID to filename
+    Output: .nii file in output folder. filename/location is returned
+    """
+    data_reshaped = data.reshape(dimensions.x,dimensions.y,dimensions.z)
+    data_img = nib.Nifti1Image(data_reshaped, dimensions.affine)
+    out_file = os.path.join(folders['out'],f'{prefix}_{animal}.nii')
+    nib.save(data_img, out_file)
+    return out_file
+
+
+def run_module(folders, moduleName, modulInputs):
+    print(f'running {moduleName} analysis...')
+    pm.execute_notebook(
+       os.path.join(folders['notebooks'],f'{moduleName}.ipynb'),
+       os.path.join(folders['animal'],f'{moduleName}_output.ipynb'),
+       parameters = modulInputs
+    )
