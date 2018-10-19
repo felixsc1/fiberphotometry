@@ -153,16 +153,22 @@ def save_nifti(data, dimensions, folders, animal, prefix):
     return out_file
 
 
-def run_module(folders, moduleName, modulInputs):
+def run_module(folders, moduleName, moduleInputs, overwrite = True):
+    """
+    Expects that there is a notebook called "moduleName.ipynb" in the folders['notebooks'] folder for the analysis.
+    moduleInputs are the parameters forwarded to the notebook.
+    overwrite:  When set to True: will always run analysis for every animal, even when it has already run.
+    When set to False: Will only run analysis for animals that don't have an output notebook in their data folder yet (will print warning). Warning: Even with overwrite = True, some AFNI steps may not overwrite already existing files, or even crash the analysis. Better delete the files manually beforehand.
+    """
     print(f'running {moduleName} analysis...')
     out_notebook = os.path.join(folders['animal'],f'{moduleName}_output.ipynb')
-    if os.path.exists(out_notebook):
+    if (os.path.exists(out_notebook) and not overwrite):
         print(f'animal already analyzed (delete {out_notebook} to re-run analysis)')
         return 
     pm.execute_notebook(
        os.path.join(folders['notebooks'],f'{moduleName}.ipynb'),
        os.path.join(folders['animal'],f'{moduleName}_output.ipynb'),
-       parameters = modulInputs
+       parameters = moduleInputs
     )
     
 
