@@ -6,6 +6,7 @@ import pandas as pd
 import nibabel as nib
 import papermill as pm
 import shutil
+from lmfit.models import ExpressionModel
 
 from os.path import expanduser
 home = expanduser("~")
@@ -277,3 +278,28 @@ def custom_detrend(x, baseline):
     trendline = np.polyval(fit, t)
     x_detrended = x - trendline + np.mean(x)
     return x_detrended, trendline
+
+
+def exp_fits(x,x0,xend,t_res):
+    
+    # model = ExpressionModel('B*(1 - exp(-ktrans * (x)))')
+    model = ExpressionModel('B*(1 - exp(-ktrans * (x))) * exp(-w * x)') # with washout
+
+    params = model.make_params()
+    params['ktrans'].set(value=0.001,min=0.0001, max=0.1)
+    params['B'].set(value=0.1, min=0.01, max=50)
+    params['w'].set(value=0.0001,min=0, max=0.001)
+
+
+    signal = x[x0:xend]-x[x0]
+
+    time = np.arange(0, signal.size, 1)*t_res
+
+    result = model.fit(signal, params, x=time)
+
+    slope = result.best_values['B']*result.best_values['ktrans']  #derivative of model function at point x=0
+#     integral = np.sum(result.best_fit)
+    maximum = np.max(result.best_fit)
+    TTP = np.argmax(result.best_fit) * t_res
+    
+    return result, slope, maximum, TTP
