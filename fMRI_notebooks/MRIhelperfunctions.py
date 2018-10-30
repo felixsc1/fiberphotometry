@@ -1,12 +1,13 @@
-import subprocess
-import os
-import glob
+import subprocess, os, glob
 import numpy as np
 import pandas as pd
 import nibabel as nib
 import papermill as pm
 import shutil
 from lmfit.models import ExpressionModel
+import http.client, urllib
+
+
 
 from os.path import expanduser
 home = expanduser("~")
@@ -205,7 +206,7 @@ def copy_notebook_outputs(folders, animal, modality, info):
 
 def select_for_group_average(folder, info, map_names, exclude='xxx343434343', row='genotype'):
     """
-    Looks at all nii files in folder,
+    Looks at all *.nii files in folder,
     first filters by prefix string e.g. CBV_map and string to exclude (e.g. male)
     then groups the results based on a row in the info dataframe (e.g. genotype)
     output are two lists group1, group2 with the full path of all files in a group.
@@ -260,7 +261,10 @@ def ttest_2groups(outfolder, map_name, group1, group2, blur=0.0):
     outfile = os.path.join(outfolder,f'mean{map_name}_Ttest.nii')
     filelist_formatted1 = " ".join(map(str, group1))
     filelist_formatted2 = " ".join(map(str, group2))
-    runAFNI(f"3dttest++ -prefix {outfile} -setA {filelist_formatted1} -labelA group1 -setB {filelist_formatted2} -labelB group2 -toz  -exblur {blur} -overwrite", printout=False)
+    if blur == 0:  # e.g. for 2D datasets, which don't allow exblur option
+        runAFNI(f"3dttest++ -prefix {outfile} -setA {filelist_formatted1} -labelA group1 -setB {filelist_formatted2} -labelB group2 -toz -overwrite", printout=False)
+    else:
+        runAFNI(f"3dttest++ -prefix {outfile} -setA {filelist_formatted1} -labelA group1 -setB {filelist_formatted2} -labelB group2 -toz  -exblur {blur} -overwrite", printout=False)
     print(f"created {outfile}")
     
     
@@ -270,20 +274,43 @@ def custom_detrend(x, baseline):
     Linear (or polynomial) detrending of time-series x.
     Fit is only performed for the initial baseline period (units for bsl are just array points, not seconds!)
     but extrapolated fit curve is subtracted over whole time series x (mean is re-added).
-    Afni tools etc only perform fits on whole time series.
+    AFNI and co only perform fits on whole time series.
     """ 
     t = np.arange(0,x.size)
-    t_bsl = np.arange(0,baseline)
+    t_bsl = t[0:baseline]
     fit = np.polyfit(t_bsl, x[0:baseline], 1)
     trendline = np.polyval(fit, t)
     x_detrended = x - trendline + np.mean(x)
     return x_detrended, trendline
 
+def custom_detrend_exp(x, baseline, endpoints):
+    """
+    Variation of custom_detrend()
+    """ 
+    t = np.arange(0,x.size)
+    t_bsl = t[0:baseline]
+    t_end = t[-endpoints:]
+    t_combine = np.append(t_bsl, t_end)
+    x_bsl = x[0:baseline]
+    x_end = x[-endpoints:]
+    x_combine = np.append(x_bsl, x_end)
+    
+    x_log = np.log(x_combine)
+    fit = np.polyfit(t_combine, x_log, 1)
+    trendline = np.polyval(fit, t)
+    x_detrended = x - np.exp(trendline) + np.mean(x)
+    return x_detrended, trendline
+
+
+
 
 def exp_fits(x,x0,xend,t_res):
-    
+    """
+    fits an exponential signal increase starting from x0 to xend, optionally with an exponential washout term of the contrast agent.
+    output contains various parameters computed from the fit
+    """
     # model = ExpressionModel('B*(1 - exp(-ktrans * (x)))')
-    model = ExpressionModel('B*(1 - exp(-ktrans * (x))) * exp(-w * x)') # with washout
+    model = ExpressionModel('B*(1 - exp(-ktrans * (x))) * exp(-w * x)', nan_policy='propagate') # with washout
 
     params = model.make_params()
     params['ktrans'].set(value=0.001,min=0.0001, max=0.1)
@@ -302,4 +329,17 @@ def exp_fits(x,x0,xend,t_res):
     maximum = np.max(result.best_fit)
     TTP = np.argmax(result.best_fit) * t_res
     
-    return result, slope, maximum, TTP
+    return result, slope, maximum, TTP, signal, time
+
+def pushover(message, recipient = 'Huawei'):
+
+    conn = http.client.HTTPSConnection("api.pushover.net:443")
+    conn.request("POST", "/1/messages.json",
+      urllib.parse.urlencode({
+        "token": "axB8uLxeVed3b32AVcvd6QfdLzEfS4",
+        "user": "uWqdKSNezFzvHjcSEFcxTWySEzCtur",
+        "device": recipient,
+        "message": message,
+      }), { "Content-type": "application/x-www-form-urlencoded" })
+    conn.getresponse()
+
