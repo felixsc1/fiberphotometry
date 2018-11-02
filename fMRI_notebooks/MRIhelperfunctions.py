@@ -239,7 +239,7 @@ def select_for_group_average(folder, info, map_names, exclude='xxx343434343', ro
 def average_map(map_name, out_folder, group1, group2):
     """
     OBSOLETE: using 3dttest++ also calculates the mean maps for each group as well as difference map.
-    created with the WET (write everything twice) principle :(
+    created according to the WET (write everything twice) principle :(
     """
     outfile1 = os.path.join(out_folder,f'mean{map_name}_group1.nii')
     filelist_formatted = " ".join(map(str, group1))
@@ -342,4 +342,18 @@ def pushover(message, recipient = 'Huawei'):
         "message": message,
       }), { "Content-type": "application/x-www-form-urlencoded" })
     conn.getresponse()
+
+
+def extract_roi(data, roi, name='ROIdata'):
+    """
+    Inputs must be full directories to the files.
+    Optional name of file can be given.
+    Output is stored in same directory as data.
+    Returns path to the roi file.
+    """
+    folder = os.path.dirname(data)
+    filename = name + '.1D'
+    outfile = os.path.join(folder,filename)
+    runAFNI(f'3dROIstats -mask {roi} {data} > {outfile}')
+    return outfile
 
