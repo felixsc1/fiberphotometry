@@ -6,8 +6,8 @@ import papermill as pm
 import shutil
 from lmfit.models import ExpressionModel
 import http.client, urllib
-
-
+import re
+import fnmatch
 
 from os.path import expanduser
 home = expanduser("~")
@@ -211,14 +211,24 @@ def select_for_group_average(folder, info, map_names, exclude='xxx343434343', ro
     then groups the results based on a row in the info dataframe (e.g. genotype)
     output are two lists group1, group2 with the full path of all files in a group.
     
-    Limitations: Must have exactly 2 groups, must be encoded with 1 or 2.
+    Limitations: Must have exactly 2 groups, genotype row in info df must be encoded with 1 or 2.
     """
     allfiles = os.path.join(folder,'*.nii')
 
-    files = [fn for fn in glob.glob(allfiles)
-            if exclude not in os.path.basename(fn) and
-            os.path.basename(fn).startswith(map_names)]
-
+    files_a = [fn for fn in glob.glob(allfiles) if os.path.basename(fn).startswith(map_names)]
+    
+    files=[]
+    for file in files_a:
+        if any([animal in os.path.basename(file) for animal in exclude]):
+            print(f'skipping {os.path.basename(file)}')
+            continue
+        else:
+            files.append(file)
+    
+#         files = [fn for fn in glob.glob(allfiles)
+#             if not exclusion_logic(exclude, fn) and
+#             os.path.basename(fn).startswith(map_names)]
+    
     x = info.loc[row,:].to_dict()
 
     x_1 = {k : v for k,v in x.items() if v == 1.0}
@@ -239,7 +249,7 @@ def select_for_group_average(folder, info, map_names, exclude='xxx343434343', ro
 def average_map(map_name, out_folder, group1, group2):
     """
     OBSOLETE: using 3dttest++ also calculates the mean maps for each group as well as difference map.
-    created with the WET (write everything twice) principle :(
+    created according to the WET (write everything twice) principle :(
     """
     outfile1 = os.path.join(out_folder,f'mean{map_name}_group1.nii')
     filelist_formatted = " ".join(map(str, group1))
@@ -343,3 +353,70 @@ def pushover(message, recipient = 'Huawei'):
       }), { "Content-type": "application/x-www-form-urlencoded" })
     conn.getresponse()
 
+
+def extract_roi(data, roi, name='ROIdata'):
+    """
+    Inputs must be full directories to the files.
+    Optional name of file can be given.
+    Output is stored in same directory as data.
+    Returns path to the roi file.
+    """
+    folder = os.path.dirname(data)
+    filename = name + '.1D'
+    outfile = os.path.join(folder,filename)
+    runAFNI(f'3dROIstats -mask {roi} {data} > {outfile}', printout=False)
+    return outfile
+
+
+def create_clean_csv(path, csvname='roi_all.csv', measurement=''):
+    """
+    Only works for 1.D ROI files generated with AFNI 3dROIstats AND
+    ROI files MUST be generated (named correctly) with name_rois() function here.
+    
+    For emergencies, the regular expression parts can be commented out, 
+    to just get an unsorted excel sheet should work with every kind of data then.
+    
+    1. Searches for all the .1D files in path.
+    2. Puts them all into one big dataframe
+    3. adds column for group 1 or group 2 (only 2 group data supported)
+    4. adds column 'animal' with animal ID
+    5. adds column 'measurement' with type of measurement
+    6. stores dataframe as .csv and returns the dataframe
+    
+    """
+    frame = []
+    allFiles = glob.glob(path + "/*.1D")
+    frame = pd.DataFrame()
+    list_ = []
+    for file_ in allFiles:
+        df = pd.read_csv(file_, index_col=0, sep='\t', header=0)
+        if fnmatch.fnmatch(file_, '*group1*'):
+            df['group'] = 1
+        elif fnmatch.fnmatch(file_, '*group2*'):
+            df['group'] = 2
+        else:
+            df['group'] = np.nan
+            print(os.path.splitext(os.path.splitext(file_)[0]))
+
+        list_.append(df)
+    frame = pd.concat(list_)
+    frame.reset_index(level=0, inplace=True) # prevents that filename is the index, instead makes it a column called 'File'
+    
+    animalre = re.compile(r'(glut1_(.*))(.nii)')
+    measurere = re.compile(fr'({measurement}(.*))(_glut)')
+    i=0
+    for line in frame['File']:
+        line = os.path.basename(line)
+        x = animalre.search(line)
+        y = measurere.search(line)
+        frame.loc[i,'animal'] = x.group(1)
+        frame.loc[i,'measurement'] = y.group(1)
+        i+=1
+
+    del frame['Sub-brick']
+    del frame['File']
+
+    csvfile=os.path.join(path,csvname)+'.csv'
+    frame.to_csv(csvfile, index=False)
+    print('created', csvfile)
+    return frame, csvfile
