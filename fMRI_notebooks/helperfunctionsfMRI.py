@@ -29,8 +29,10 @@ def CreateStimParadigm(paradigm):
     return stimulus_times
 
 
-def volreg(infile):
-    outfile = 
-    runAFNI('3dvolreg -prefix r' + files + '.volreg' \
-                    ' -base single_timepoint+orig -Fourier -zpad 1 -tshift 0' \
-                    ' -1Dfile dfile.r' + files + '.1D ' + files + '+orig')
+def volreg(folders):
+    """
+    Expects that a file single_timepoint has been created.
+    """
+    infile = folder['main']
+    outfile = f"{infile}_volreg.nii"
+    runAFNI(f'3dvolreg -prefix {infile}.volreg -base single_timepoint+orig -Fourier -zpad 1 -tshift 0 -1Dfile dfile.{infile}.1D {infile}')
