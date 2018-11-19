@@ -8,6 +8,8 @@ from lmfit.models import ExpressionModel
 import http.client, urllib
 import re
 import fnmatch
+from scipy.stats import ttest_ind
+import matplotlib.pyplot as plt
 
 from os.path import expanduser
 home = expanduser("~")
@@ -420,3 +422,28 @@ def create_clean_csv(path, csvname='roi_all.csv', measurement=''):
     frame.to_csv(csvfile, index=False)
     print('created', csvfile)
     return frame, csvfile
+
+
+
+def MR_boxplots(plotframe):
+    """
+    dataframe input must have quite specific format. only works for GLUT1_Analysis notebook.
+    currently only works for one ROI (could be easily selected as second parameter input)
+    Must have group columns with 1 or 2 (see function create_clean_csv above).
+    """
+    individualFrames={}
+    roiname = plotframe.columns[0]
+    for measurement in plotframe['measurement'].unique():
+        individualFrames[measurement] = plotframe.loc[plotframe['measurement'] == measurement]
+        individualFrames[measurement]['group1'] = individualFrames[measurement].loc[plotframe['group'] == 1, roiname]
+        individualFrames[measurement]['group2'] = individualFrames[measurement].loc[plotframe['group'] == 2, roiname]
+
+        cat1 = individualFrames[measurement]['group1'].dropna()
+        cat2 = individualFrames[measurement]['group2'].dropna()
+        tstat, pval = ttest_ind(cat1, cat2)
+        
+        plt.figure()
+        boxplot = individualFrames[measurement].boxplot(column=['group1', 'group2'])
+        plt.title(measurement + ' - ' + roiname)
+        txt = f"t = {round(tstat,3)}, P = {round(pval,3)}"
+        plt.figtext(0.5, 0.01, txt, wrap=True, horizontalalignment='center', fontsize=12)
