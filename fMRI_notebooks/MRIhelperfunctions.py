@@ -106,7 +106,21 @@ def check_and_convert(folders, animal):
         os.makedirs(animal_output_folder)
         convertAll(folders['animal'], animal_output_folder)
 
-        
+                         
+def check_and_convert_single(folders):
+    """
+    Is there already a folder for this animal in the main analysis folder?
+    If not, create it and convert all 2dseqs of this animal and move them to analysis subfolder
+    """
+    folders['analysis'] = os.path.join(folders['animal'],'analysis')
+    folders['scan'] = os.path.join(folders['analysis'],folders['scanNumber'])
+    actualinput = os.path.join(folders['animal'],folders['scanNumber'])
+    folders['raw'] = f"{folders['scan']}/X{folders['scanNumber']}P1.nii"
+    if not os.path.exists(folders['scan']):
+        os.makedirs(folders['scan'])
+        convertAll(actualinput, folders['scan'])
+    return folders
+                       
         
 def simple_coreg(template, scanA, scanB, out_dir):
     """
@@ -140,7 +154,38 @@ def coreg_epi(template, scanA, scanB, out_dir):
                                 " -save_vr" \
                                 " -cost ls")
 
-
+                         
+def get_single_timepoint(scan):
+    outfile = os.path.join(os.path.dirname(scan), 'single_timepoint.nii')             
+    runAFNI(f"3dTcat -overwrite -prefix {outfile} {scan}'[0]'")
+    return outfile
+                     
+                         
+from os.path import expanduser
+def coreg_epi_to_template(template, scan):
+    single_timepoint = get_single_timepoint(scan)
+    scanpath = os.path.dirname(scan)
+    os.chdir(scanpath) # somehow it would otherwise always store files in wrong folder with python2.7 code
+    homepath = expanduser("~")
+    runAFNI("python2.7 " + homepath + "/abin/align_epi_anat.py -dset2to1 -dset1 " + template + " -dset2 " + single_timepoint + \
+                                    " -child_dset2 " + scan + \
+                                    " -dset1_strip None -dset2_strip None"  \
+                                    " -overwrite" \
+                                    " -big_move" \
+                                    " -volreg on -volreg_method 3dvolreg" \
+                                    " -volreg_opts '-Fourier -zpad 1 -dfile dfile.1D'" \
+                                    " -Allineate_opts '-maxrot 10 -maxshf 3 -conv 0.005 -twofirst -twoblur 0.8 -source_automask+2 -final wsinc5'" \
+                                    " -tshift on -tshift_opts '-tzero 0 -quintic'" \
+                                    " -dset2_base 0" \
+                                    " -volreg_base 0" \
+                                    " -suffix .volreg" \
+                                    " -cost ls")
+    
+    outfile = scan[:-4] + '.volreg+orig.BRIK'   # <-- remove .nii part                     
+    return outfile
+                         
+                         
+                         
 def save_nifti(data, dimensions, folders, animal, prefix):
     """
     Input:  data is flattened np array.
