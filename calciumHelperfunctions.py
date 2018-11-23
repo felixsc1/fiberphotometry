@@ -58,6 +58,31 @@ def detect_stim_paradigm(stimchannel, fs):
     print('Signals slower than ' + str(period) + 's will be removed (later)')
     return n_pulses, n_blocks, stim_freq, pulses_block, block_duration, off_period, peakindexes_sec, peakindexes, period
 
+def detect_stim_paradigm_TDMS(stimchannels, fs):
+    '''
+    only works for evenly spaced block paradigms with constant ISI
+    '''
+    stim_paradigm = {}
+    stim_paradigm['peakindices'] = peakutils.indexes(stimchannels['Stimulus'].data, thres=0.6, min_dist=0.01*fs)
+    stim_paradigm['peakindices_s'] = stim_paradigm['peakindices']/fs
+    delays = np.around(np.diff(stim_paradigm['peakindices_s']),decimals=2)
+    x = Counter(delays)   #counts elements in the input, and then shows which is most frequent, how often it appears etc...
+    x1 = x.most_common(1)
+    stim_paradigm['n_pulses'] = x1[0][1]
+    x2 = x.most_common()[:-2:-1]  #find the longest delay (i.e. the least common value)
+    stim_paradigm['n_blocks'] = x2[0][1] + 1
+    stim_paradigm['stim_freq'] = np.round(1 / x1[0][0])  #remove round() for stim <1Hz
+    pulses_block = stim_paradigm['n_pulses'] / stim_paradigm['n_blocks'] + 1
+    stim_paradigm['block_duration'] = np.round(pulses_block / stim_paradigm['stim_freq'])
+    stim_paradigm['off_period'] = x2[0][0] - x1[0][0]
+    print(f"stim freq: {stim_paradigm['stim_freq']} Hz")
+    print(f"ON duration: {stim_paradigm['block_duration']} s")
+    print(f"OFF duration: {stim_paradigm['off_duration']} s")
+    stim_paradigm['period'] = (stim_paradigm['block_duration'] + stim_paradigm['off_duration']) * 2
+    print(f"Signals slower than {stim_paradigm['period']} s will be removed (later)")
+    return stim_paradigm
+
+
 
 def FFT_calculate_plot(calcium, fs, plotsize):
     f1, Pxx_den1 = signal.welch(calcium['channel1','raw'], fs, nperseg=65536)
