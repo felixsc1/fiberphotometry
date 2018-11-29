@@ -12,7 +12,6 @@ import plotly as py
 import plotly.graph_objs as go
 from IPython.display import set_matplotlib_formats
 set_matplotlib_formats('retina')
-import pylab
 
 
 plt.style.use('seaborn-white')
@@ -27,10 +26,10 @@ def openfiledialogue(whichending):
         dir1 = 'D:\\data\\2015'
         #dir1 = 'C:\\'   # Windows
     else:
-        dir1 = '/Volumes/Zhivaz/'
+        dir1 = os.path.expanduser("~")
 
     root.focus_force()
-    # root.withdraw()
+    root.withdraw()
     file_path = askopenfilename(filetypes = ftypes, initialdir = dir1, title = ttl)
     root.deiconify(), root.update(), root.destroy()
     return file_path
@@ -40,6 +39,7 @@ def detect_stim_paradigm(stimchannel, fs):
     only works for evenly spaced block paradigms with constant ISI
     '''
     peakindexes = peakutils.indexes(stimchannel, thres=0.6, min_dist=0.01*fs)
+
     peakindexes_sec=peakindexes/fs
     delays = np.around(np.diff(peakindexes_sec),decimals=2)
     x = Counter(delays)   #counts elements in the input, and then shows which is most frequent, how often it appears etc...
@@ -63,7 +63,7 @@ def detect_stim_paradigm_TDMS(stimchannels, fs):
     only works for evenly spaced block paradigms with constant ISI
     '''
     stim_paradigm = {}
-    stim_paradigm['peakindices'] = peakutils.indexes(stimchannels['Stimulus'].data, thres=0.6, min_dist=0.01*fs)
+    stim_paradigm['peakindices'] = peakutils.indexes(np.array(stimchannels['Stimulus']), thres=0.6, min_dist=int(0.01*fs))
     stim_paradigm['peakindices_s'] = stim_paradigm['peakindices']/fs
     delays = np.around(np.diff(stim_paradigm['peakindices_s']),decimals=2)
     x = Counter(delays)   #counts elements in the input, and then shows which is most frequent, how often it appears etc...
@@ -74,7 +74,7 @@ def detect_stim_paradigm_TDMS(stimchannels, fs):
     stim_paradigm['stim_freq'] = np.round(1 / x1[0][0])  #remove round() for stim <1Hz
     pulses_block = stim_paradigm['n_pulses'] / stim_paradigm['n_blocks'] + 1
     stim_paradigm['block_duration'] = np.round(pulses_block / stim_paradigm['stim_freq'])
-    stim_paradigm['off_period'] = x2[0][0] - x1[0][0]
+    stim_paradigm['off_duration'] = x2[0][0] - x1[0][0]
     print(f"stim freq: {stim_paradigm['stim_freq']} Hz")
     print(f"ON duration: {stim_paradigm['block_duration']} s")
     print(f"OFF duration: {stim_paradigm['off_duration']} s")
@@ -262,7 +262,7 @@ def calciumDetrend(calcium_ds, N, pnum, plotsize, peakindexes_sec, storagepath):
     plt.legend()
     plt.xlabel('time [s]')
     _ = [plt.axvline(_p, alpha=0.2, color='red') for _p in peakindexes_sec]
-    pylab.savefig(os.path.join(storagepath,f'detrended_ch{N}.svg'))
+    plt.savefig(os.path.join(storagepath,f'detrended_ch{N}.svg'))
     return calcium_ds
 
 def find_optimal_polynomial(calcium_ds, period):
@@ -416,7 +416,7 @@ def average_and_plot(which_channel, n_blocks, block_duration, stim_freq, calcium
     
     
     
-def average_and_plot_TDMS(which_channel, paradigm, calcium_ds, baseline, _time, tres_new, storagepath):
+def average_and_plot_TDMS(calcium_ds, which_channel, paradigm, baseline, _time, tres_new, storagepath):
  
     idx = pd.IndexSlice  #see my notes, this allows slicing multilevel data
     
