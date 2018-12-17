@@ -23,7 +23,7 @@ def openfiledialogue(whichending):
     ttl = "Select file"
 
     if os.name == 'nt':
-        dir1 = 'D:\\data\\2015'
+        dir1 = 'D:\\data\\2018'
         #dir1 = 'C:\\'   # Windows
     else:
         dir1 = os.path.expanduser("~")
