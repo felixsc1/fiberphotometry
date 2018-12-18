@@ -1,0 +1,21 @@
+name: calciumAIC
+channels:
+  - conda-forge
+dependencies:
+  - python=3.7
+  - numpy
+  - matplotlib
+  - scipy
+  - pandas
+  - plotly
+  - nb_conda
+  - nb_conda_kernels
+  - ipykernel
+  - ipywidgets
+  - jupyter-notebook
+  - dill
+  - peakutils
+  - lmfit
+  - nptdms
+  - pip:
+    - lvm_read
