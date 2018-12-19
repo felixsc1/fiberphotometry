@@ -12,7 +12,6 @@ dependencies:
   - nb_conda_kernels
   - ipykernel
   - ipywidgets
-  - jupyter-notebook
   - dill
   - peakutils
   - lmfit
