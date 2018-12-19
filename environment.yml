@@ -16,5 +16,6 @@ dependencies:
   - peakutils
   - lmfit
   - nptdms
+  - jupyter
   - pip:
     - lvm_read
