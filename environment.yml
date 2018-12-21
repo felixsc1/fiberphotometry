@@ -17,5 +17,7 @@ dependencies:
   - nptdms
   - jupyter
   - nb_conda
+  - nibabel
+  - papermill
   - pip:
     - lvm_read
