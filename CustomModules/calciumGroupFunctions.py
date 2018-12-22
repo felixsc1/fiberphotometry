@@ -1,5 +1,4 @@
-import fnmatch
-import os
+import os, glob, fnmatch
 import scipy.io as sio
 import pandas as pd
 import numpy as np
@@ -13,6 +12,10 @@ import dill as pickle
 # set_matplotlib_formats('retina')
 
 def get_filepaths(mainpath, fileending='*.mat'):
+    """
+    Maybe this could be done easier with this code:
+    
+    old version (way too complicated):
     filepaths = []
     for folderName, subfolders, filenames in os.walk(mainpath):
         for file in filenames:
@@ -20,6 +23,8 @@ def get_filepaths(mainpath, fileending='*.mat'):
                 filepaths.append(os.path.join(os.path.abspath(folderName),file))
 
     print('files found: ', filepaths)
+    """
+    filepaths = glob.glob(os.path.join(os.path.abspath(mainpath),fileending))
     return filepaths
     
     
@@ -262,3 +267,28 @@ def excel_multi_sheets(in_library, path, filename='Results.xlsx'):
         value.to_excel(writer, sheet_name=key)
     writer.save()
     print(f"stored data under {outfile}")
+    
+    
+# mainly BOLD related stuff below:
+
+def load_afni_rois(file_path, file_ending='*ROIdata.1D'):
+    """
+    Should work for any number of ROI files, and any number of ROIs (but all files should have same number of rois).
+    """
+    ROIfiles = get_filepaths(file_path, file_ending)
+    print(f'loading: {ROIfiles}')
+    dataframes = []
+    keys = []
+    i=0
+    for files in ROIfiles:
+        dataframes.append(pd.read_table(files))
+        name=os.path.basename(ROIfiles[i][:-len(file_ending)+1]) #cut off *ROIdata.1D = 10 chars 
+        del dataframes[-1]['File']
+        del dataframes[-1]['Sub-brick']
+        for ROI in range(dataframes[-1].columns.size):
+            keys.append(name + dataframes[-1].columns[ROI])  # adjust for number of ROIs
+        i+=1
+
+    frames = pd.concat(dataframes, axis=1)
+    frames.columns = keys  
+    return frames
