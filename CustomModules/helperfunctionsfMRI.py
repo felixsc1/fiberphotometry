@@ -111,13 +111,13 @@ def find_cleaned_data(folders):
     
     
     
-def averageblocks(inputdf,paradigm, averaging):
+def averageblocks(inputdf, paradigm, averaging):
     """
     Is also used in CalciumGroupAnalysis (just needs some modification)
     """
     starttimes = np.array(paradigm['stim_onsets'])-paradigm['initial_cutoff']
     baseline = averaging['baseline']
-    duration = averaging['time']+paradigm['stim_duration']
+    duration = averaging['time'] + paradigm['stim_duration']
     
     idx = pd.IndexSlice
     blocks_mean=[]
