@@ -13,18 +13,17 @@ import dill as pickle
 
 def get_filepaths(mainpath, fileending='*.mat'):
     """
-    Maybe this could be done easier with this code:
-    
-    old version (way too complicated):
+    Finds the files in ALL subfolders.
+    # old but simpler version (finds only files in main folder, not in subfolders):
+    # filepaths = glob.glob(os.path.join(os.path.abspath(mainpath),fileending))
+    """
     filepaths = []
     for folderName, subfolders, filenames in os.walk(mainpath):
         for file in filenames:
             if fnmatch.fnmatch(file, fileending):
                 filepaths.append(os.path.join(os.path.abspath(folderName),file))
 
-    print('files found: ', filepaths)
-    """
-    filepaths = glob.glob(os.path.join(os.path.abspath(mainpath),fileending))
+    print('files found: \n', filepaths)
     return filepaths
     
     
@@ -269,14 +268,31 @@ def excel_multi_sheets(in_library, path, filename='Results.xlsx'):
     print(f"stored data under {outfile}")
     
     
+    
+def check_if_arrays_equal(a, b):
+    if a.shape != b.shape:
+        print("The blocks don't have the same number of pulses as in the calcium data")
+        return False
+    for ai, bi in zip(a.flat, b.flat):
+        if ai != bi:
+            print("The timings don't match with that of the calcium")
+            return False
+    return True    
+    
+    
+    
+# ==============================================================    
 # mainly BOLD related stuff below:
+# ==============================================================    
 
-def load_afni_rois(file_path, file_ending='*ROIdata.1D'):
+
+def load_afni_rois(file_path, IDs='', file_ending='*ROIdata.1D'):
     """
     Should work for any number of ROI files, and any number of ROIs (but all files should have same number of rois).
+    IDs (optional) is list of animal/scan names, will be combined with ROI name. Must have same lenght as ROIfiles. Can also be used to override the automatic name given from ROIfile.
+    In in the future ID should be in the ROIdata.1D filename!
     """
     ROIfiles = get_filepaths(file_path, file_ending)
-    print(f'loading: {ROIfiles}')
     dataframes = []
     keys = []
     i=0
@@ -286,9 +302,63 @@ def load_afni_rois(file_path, file_ending='*ROIdata.1D'):
         del dataframes[-1]['File']
         del dataframes[-1]['Sub-brick']
         for ROI in range(dataframes[-1].columns.size):
-            keys.append(name + dataframes[-1].columns[ROI])  # adjust for number of ROIs
+            try:
+                keys.append(IDs[i] + ' ' + dataframes[-1].columns[ROI])
+            except:
+                keys.append(name + dataframes[-1].columns[ROI])
         i+=1
 
     frames = pd.concat(dataframes, axis=1)
     frames.columns = keys  
     return frames
+
+
+def averageblocks(inputdf,starttimes,baseline,duration):
+    """
+    Goal: This function should work for any dataframe (calcium, or BOLD signals)
+    probably only works for 1s TR BOLD at the moment!
+    """
+    columnnames = inputdf.columns.values
+    idx = pd.IndexSlice
+    blocks_mean=[]
+    block_time = np.arange(-baseline,duration) 
+    blockIndex = pd.Index(block_time, name='Time [s]')
+    
+    for i in range(inputdf.columns.size):
+        block_single = []
+        
+        for n in starttimes:
+            #shifting the baseline of each block to zero
+            _temp = inputdf.iloc[n-baseline:n+duration,i].reset_index(drop=True)
+            _temp -= _temp.iloc[:baseline].mean()
+            block_single.append(_temp)
+        
+        blocks = pd.concat(block_single, axis=1, ignore_index = True)
+        blocks['time'] = blockIndex
+        blocks.set_index('time',drop=True,inplace=True)           
+            
+        blocks_mean.append(blocks.mean(axis=1))
+        
+    blocks_output = pd.concat(blocks_mean, axis=1, ignore_index = True)
+    blocks_output['time'] = blockIndex
+    blocks_output.set_index('time',drop=True,inplace=True)
+    blocks_output.columns = columnnames
+    return blocks_output
+                                     
+# BOLDaverages = averageblocks(frames,stimList,10,50)
+# BOLDaverages.columns =keys
+
+
+
+def averageblocks_BOLD(inputdf, normalized, stim_events):
+    """
+    calls generic averageblocks() above, reading some additional parameters from the calcium, 
+    to make both averages comparable (same timings etc.)
+    """
+    baseline = int(np.absolute(np.round(normalized['ch1'].index[0])))
+    duration = int(np.round(normalized['ch1'].index[-1]))
+    
+    starttimes = stim_events
+    BOLDaverages = averageblocks(inputdf,starttimes,baseline,duration)
+    
+    return BOLDaverages
