@@ -87,6 +87,31 @@ def Deconvolve(scan,paradigm):
                         ' -bucket statsSPM_' \
                         ' -cbucket regcoeffsSPM')
 
+    
+def Deconvolve_calcium_2ch(scan,paradigm, calcium_regressors):
+    scanpath = os.path.dirname(scan)
+    os.chdir(scanpath) # just easier than working with full paths below
+    runAFNI('3dDeconvolve -input ' + scan + \
+                        ' -polort 0' \
+                        ' -nodmbase' \
+                        ' -overwrite' \
+                        ' -num_stimts 2' \
+                        ' -stim_times_AM1 1 ' + calcium_regressors[0] + \
+                        " 'SPMG3(" + str(0.01) + ")'" \
+                        ' -stim_times_AM1 2 ' + calcium_regressors[1] + \
+                        " 'SPMG3(" + str(0.01) + ")'" \
+                        ' -stim_label 1 Neuro' \
+                        ' -stim_label 2 Astro' \
+                        ' -glt_label 1 NeuroMinusAstro ' \
+                        ' -glt_label 2 AstroMinusNEuro ' \
+                        " -gltsym 'SYM: +Neuro -Astro'" \
+                        " -gltsym 'SYM: +Astro -Neuro'" \
+                        ' -iresp 1 HRF_Neuro' \
+                        ' -iresp 2 HRF_Astro' \
+                        ' -fout -tout -x1D X.xmat.1D -xjpeg X.jpg' \
+                        ' -fitts fitts_BothCh' \
+                        ' -bucket stats_BothCh')   
+    
 
 def find(pattern, path):
     """

@@ -11,20 +11,26 @@ import dill as pickle
 # from IPython.display import set_matplotlib_formats
 # set_matplotlib_formats('retina')
 
-def get_filepaths(mainpath, fileending='*.mat'):
+def get_filepaths(mainpath, fileending='*.mat', subfolders=True):
     """
     Finds the files in ALL subfolders.
-    # old but simpler version (finds only files in main folder, not in subfolders):
-    # filepaths = glob.glob(os.path.join(os.path.abspath(mainpath),fileending))
     """
     filepaths = []
-    for folderName, subfolders, filenames in os.walk(mainpath):
-        for file in filenames:
-            if fnmatch.fnmatch(file, fileending):
-                filepaths.append(os.path.join(os.path.abspath(folderName),file))
+    
+    if subfolders:
+        for folderName, _subfolders, filenames in os.walk(mainpath):
+            for file in filenames:
+                if fnmatch.fnmatch(file, fileending):
+                    filepaths.append(os.path.join(os.path.abspath(folderName),file))
+    
+    else:   
+        filepaths = glob.glob(os.path.join(os.path.abspath(mainpath),fileending))
+
 
     print('files found: \n', filepaths)
+  
     return filepaths
+
     
     
 def get_nth_key(dictionary, n=0):

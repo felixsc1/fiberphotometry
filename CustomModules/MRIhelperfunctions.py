@@ -109,11 +109,12 @@ def check_and_convert(folders, animal):
                          
 def check_and_convert_single(folders):
     """
-    Is there already a folder for this animal in the main analysis folder?
+    checks if there already an analysis folder for this animal.
     If not, create it and convert all 2dseqs of this animal and move them to analysis subfolder
     """
     folders['analysis'] = os.path.join(folders['animal'],'analysis')
     folders['scan'] = os.path.join(folders['analysis'],folders['scanNumber'])
+    folders['raw_folder'] = os.path.join(folders['animal'],folders['scanNumber'])
     actualinput = os.path.join(folders['animal'],folders['scanNumber'])
     folders['raw'] = f"{folders['scan']}/X{folders['scanNumber']}P1.nii"
     if not os.path.exists(folders['scan']):
