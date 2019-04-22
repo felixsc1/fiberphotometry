@@ -107,10 +107,13 @@ def check_and_convert(folders, animal):
         convertAll(folders['animal'], animal_output_folder)
 
                          
-def check_and_convert_single(folders):
+def check_and_convert_single(folders, createNewTemplate=False):
     """
     checks if there already an analysis folder for this animal.
     If not, create it and convert all 2dseqs of this animal and move them to analysis subfolder
+    
+    folders['raw'] is what u usually need, the converted raw nifti file.
+    
     """
     folders['analysis'] = os.path.join(folders['animal'],'analysis')
     folders['scan'] = os.path.join(folders['analysis'],folders['scanNumber'])
@@ -120,12 +123,16 @@ def check_and_convert_single(folders):
     if not os.path.exists(folders['scan']):
         os.makedirs(folders['scan'])
         convertAll(actualinput, folders['scan'])
+    if createNewTemplate:
+        get_single_timepoint(folders['raw'], name=folders['template'], createNewTemplate=True)
+    get_single_timepoint(folders['raw'])
     return folders
                        
         
 def simple_coreg(template, scanA, scanB, out_dir):
     """
     scanA will be coregistered to template, identical transformation will be applied to scanB (no motion between A and B!)
+    NOT the one to use for fMRI
     """
     parameters = os.path.join(out_dir,'1dparams.1D')
     scanAloc = f"{out_dir}/A_coreg.nii"
@@ -138,6 +145,7 @@ def simple_coreg(template, scanA, scanB, out_dir):
 
 def coreg_epi(template, scanA, scanB, out_dir):
     """
+    probably broken, not used.
     difference to simple_coreg: also does -tshift,
     volreg off as global bolus inflow could be mistaken for movement.
     WARNING: AFNI gives error for some reason
@@ -156,9 +164,15 @@ def coreg_epi(template, scanA, scanB, out_dir):
                                 " -cost ls")
 
                          
-def get_single_timepoint(scan):
-    outfile = os.path.join(os.path.dirname(scan), 'single_timepoint.nii')             
-    runAFNI(f"3dTcat -overwrite -prefix {outfile} {scan}'[0]'")
+def get_single_timepoint(scan, name='single_timepoint.nii', createNewTemplate=False):
+    if createNewTemplate:
+        if not os.path.exists(os.path.dirname(name)):
+            os.makedirs(os.path.dirname(name))
+        outfile = name
+        runAFNI(f"3dTcat -overwrite -prefix {outfile} {scan}'[0]'")
+    else:
+        outfile = os.path.join(os.path.dirname(scan), name)             
+        runAFNI(f"3dTcat -overwrite -prefix {outfile} {scan}'[0]'")
     return outfile
                      
                          
@@ -168,8 +182,12 @@ def coreg_epi_to_template(template, scan):
     scanpath = os.path.dirname(scan)
     os.chdir(scanpath) # somehow it would otherwise always store files in wrong folder with python2.7 code
     homepath = expanduser("~")
+    #experimental - works for some reason while absolute paths dont.
+    single_timepoint = os.path.basename(single_timepoint)
+    scan_rel = os.path.basename(scan)
+    
     runAFNI("python2.7 " + homepath + "/abin/align_epi_anat.py -dset2to1 -dset1 " + template + " -dset2 " + single_timepoint + \
-                                    " -child_dset2 " + scan + \
+                                    " -child_dset2 " + scan_rel + \
                                     " -dset1_strip None -dset2_strip None"  \
                                     " -overwrite" \
                                     " -big_move" \
