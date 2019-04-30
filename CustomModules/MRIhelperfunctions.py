@@ -14,6 +14,10 @@ import matplotlib.pyplot as plt
 from os.path import expanduser
 home = expanduser("~")
 
+import helperfunctionsfMRI as fh
+
+
+
 # Creates an empty class, to group a bunch of variables.
 # See https://www.oreilly.com/library/view/python-cookbook/0596001673/ch01s08.html
 # doesnt work with papermill! non json seriliazable error
@@ -86,15 +90,76 @@ def getinfo(folders):
     return(info)
 
 
-def convertAll(folder_in, folder_out):
+def check_for_2dseq(folders):
+    Isthere2dseq = fh.find('*2dseq', folders['raw_folder'])
+    if not Isthere2dseq:
+        temp_folder = folders['raw_folder']
+        print(f"No 2dseq file found. Check if it was renamed or if {temp_folder} is really the main folder of that animal.")
+    else:
+        print('using', Isthere2dseq)
+        return True, folders
+                         
+    IsthereBRIK = fh.find('*.BRIK*', folders['raw_folder'])
+    if not IsthereBRIK:
+        print(f"No BRIK file found. Check if it is really located somewhere in {temp_folder}.")
+    else:
+        print('using', IsthereBRIK[0])
+        folders['BRIK'] = IsthereBRIK[0]
+        return False, folders
+    return False, []              
+                         
+                         
+                         
+                         
+def convertAll(folder_in, folder_out, subfolder='/subject'):
     """
     requires original paravision folder structure with subject file.
     requires Bru2 from github in PATH
     converts all 2dseqs, except tripilots, with original dimensions as .nii to folder_out
     """
-    runAFNI(f'Bru2 -a -o {folder_out} {folder_in}/subject')
+    runAFNI(f'Bru2 -a -o {folder_out} {folder_in}{subfolder}')
+
     
+                         
+                         
+# Next two functions belong together, and are used as shown in check_and_convert_single below                         
+                        
+def AFNItoNIFTI(folders, replaceHeader=False):
+    """
+    requires the folders dictionary with the values used below.
+    replacing header is optional, will then use the header info of the template.
+    """
+    raw = folders['raw']
+    BRIK = folders['BRIK']                     
+    command = f"3dAFNItoNIFTI -prefix {raw} {BRIK}"
+    runAFNI(command)
+    if replaceHeader:
+        folders['raw'] = replaceHDR(raw, folders['template'])
+    return folders
+        
+                         
+def replaceHDR(nifti, template):
+    """
+    If scan has identical dimensions, but was converted with different header infos, 
+    will replace header informations with that of the template provided.
+    """
+                    
+    img = nib.load(nifti)
+    data = img.get_data()
     
+    temp = nib.load(template)
+    hdr = temp.header.copy()
+
+    data_img = nib.Nifti1Image(data, temp.affine, hdr)
+    
+    nifti_folder = os.path.dirname(nifti)
+    filename = os.path.splitext(os.path.basename(nifti))[0]
+    out_file = os.path.join(nifti_folder,f'{filename}_fixed.nii')
+    print('replaceHDR function ran through')
+    nib.save(data_img, out_file)
+    return out_file                 
+                       
+                         
 
 def check_and_convert(folders, animal):
     """
@@ -107,32 +172,30 @@ def check_and_convert(folders, animal):
         convertAll(folders['animal'], animal_output_folder)
 
                          
-def check_and_convert_single(folders, createNewTemplate=False):
+def check_and_convert_single(folders):
     """
     checks if there already an analysis folder for this animal.
-    If not, create it and convert all 2dseqs of this animal and move them to analysis subfolder
+    If not, create it and convert all 2dseqs of this animal and move them to analysis subfolder.
     
-    folders['raw'] is what u usually need, the converted raw nifti file.
-    
+    New: If 2dseq doesn't exist anymore, but a BRIK file in same animal (sub)folders (possibly with wrong header infos), it will take that instead, exchange header with that of the template nifti and convert it also to nifti. 
     """
     folders['analysis'] = os.path.join(folders['animal'],'analysis')
     folders['scan'] = os.path.join(folders['analysis'],folders['scanNumber'])
     folders['raw_folder'] = os.path.join(folders['animal'],folders['scanNumber'])
-    actualinput = os.path.join(folders['animal'],folders['scanNumber'])
     folders['raw'] = f"{folders['scan']}/X{folders['scanNumber']}P1.nii"
+    twodseq, folders = check_for_2dseq(folders)
     if not os.path.exists(folders['scan']):
         os.makedirs(folders['scan'])
-        convertAll(actualinput, folders['scan'])
-    if createNewTemplate:
-        get_single_timepoint(folders['raw'], name=folders['template'], createNewTemplate=True)
-    get_single_timepoint(folders['raw'])
+        if not twodseq:
+            folders = AFNItoNIFTI(folders, replaceHeader=True)
+        else:
+            convertAll(folders['raw_folder'], folders['scan'])
     return folders
                        
         
 def simple_coreg(template, scanA, scanB, out_dir):
     """
     scanA will be coregistered to template, identical transformation will be applied to scanB (no motion between A and B!)
-    NOT the one to use for fMRI
     """
     parameters = os.path.join(out_dir,'1dparams.1D')
     scanAloc = f"{out_dir}/A_coreg.nii"
@@ -145,10 +208,10 @@ def simple_coreg(template, scanA, scanB, out_dir):
 
 def coreg_epi(template, scanA, scanB, out_dir):
     """
-    probably broken, not used.
     difference to simple_coreg: also does -tshift,
     volreg off as global bolus inflow could be mistaken for movement.
     WARNING: AFNI gives error for some reason
+    btw. home variable is defined at beggining of this file.
     """
     runAFNI("python2.7 " + home + "/abin/align_epi_anat.py -dset1to2 -dset1 " + scanA + " -dset2 " + template + \
                                 " -child_dset1 " + scanB + \
@@ -164,30 +227,23 @@ def coreg_epi(template, scanA, scanB, out_dir):
                                 " -cost ls")
 
                          
-def get_single_timepoint(scan, name='single_timepoint.nii', createNewTemplate=False):
-    if createNewTemplate:
-        if not os.path.exists(os.path.dirname(name)):
-            os.makedirs(os.path.dirname(name))
-        outfile = name
-        runAFNI(f"3dTcat -overwrite -prefix {outfile} {scan}'[0]'")
-    else:
-        outfile = os.path.join(os.path.dirname(scan), name)             
-        runAFNI(f"3dTcat -overwrite -prefix {outfile} {scan}'[0]'")
+def get_single_timepoint(scan):
+    outfile = os.path.join(os.path.dirname(scan), 'single_timepoint.nii')             
+    runAFNI(f"3dTcat -overwrite -prefix {outfile} {scan}'[0]'")
     return outfile
                      
                          
-from os.path import expanduser
-def coreg_epi_to_template(template, scan):
+def coreg_epi_to_template(template, scan, createNewTemplate=False):
     single_timepoint = get_single_timepoint(scan)
+    if createNewTemplate:
+        templatebackup=os.path.join(os.path.dirname(template),os.path.basename(template) + '.BACKUP')
+        shutil.copyfile(template, templatebackup)
+        print(f'Warning. The template was overwritten. Find old template under: {templatebackup}')
+        shutil.copyfile(single_timepoint, template)
     scanpath = os.path.dirname(scan)
     os.chdir(scanpath) # somehow it would otherwise always store files in wrong folder with python2.7 code
-    homepath = expanduser("~")
-    #experimental - works for some reason while absolute paths dont.
-    single_timepoint = os.path.basename(single_timepoint)
-    scan_rel = os.path.basename(scan)
-    
-    runAFNI("python2.7 " + homepath + "/abin/align_epi_anat.py -dset2to1 -dset1 " + template + " -dset2 " + single_timepoint + \
-                                    " -child_dset2 " + scan_rel + \
+    runAFNI("python2.7 " + home + "/abin/align_epi_anat.py -dset2to1 -dset1 " + template + " -dset2 " + single_timepoint + \
+                                    " -child_dset2 " + scan + \
                                     " -dset1_strip None -dset2_strip None"  \
                                     " -overwrite" \
                                     " -big_move" \

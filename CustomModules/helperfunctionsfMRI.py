@@ -3,6 +3,24 @@ import subprocess
 import numpy as np
 import pandas as pd
 
+
+### Very general use functions below. Maybe move into separate module in the future ####
+
+def find(pattern, path):
+    """
+    from: https://stackoverflow.com/questions/1724693/find-a-file-in-python
+    Usage example:  find('*.txt', '/path/to/dir')
+    Also searches in subdirectories.
+    """
+    result = []
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            if fnmatch.fnmatch(name, pattern):
+                result.append(os.path.join(root, name))
+    return result
+
+
+
 def splitall(path):
     """splits path into constituents"""
     allparts = []
@@ -102,6 +120,7 @@ def Deconvolve_calcium_2ch(scan,paradigm, calcium_regressors):
                         " 'SPMG3(" + str(0.01) + ")'" \
                         ' -stim_label 1 Neuro' \
                         ' -stim_label 2 Astro' \
+                        ' -num_glt 2' \
                         ' -glt_label 1 NeuroMinusAstro ' \
                         ' -glt_label 2 AstroMinusNEuro ' \
                         " -gltsym 'SYM: +Neuro -Astro'" \
@@ -112,19 +131,7 @@ def Deconvolve_calcium_2ch(scan,paradigm, calcium_regressors):
                         ' -fitts fitts_BothCh' \
                         ' -bucket stats_BothCh')   
     
-
-def find(pattern, path):
-    """
-    from: https://stackoverflow.com/questions/1724693/find-a-file-in-python
-    Usage example:  find('*.txt', '/path/to/dir')
-    """
-    result = []
-    for root, dirs, files in os.walk(path):
-        for name in files:
-            if fnmatch.fnmatch(name, pattern):
-                result.append(os.path.join(root, name))
-    return result
-    
+  
       
     
 def find_cleaned_data(folders):
